@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+""" Default program template
+
+"""
+import argparse
+import logging
+import logging.handlers
+import traceback
+import textwrap
+import sys
+import base64
+import os
+import libprojecttree
+
+# 3rd party
+from PySide2 import QtWidgets
+from PySide2 import QtGui
+from PySide2 import QtCore
+from PySide2 import QtSvg
+
+# My name is
+SLIM_SHADY = os.path.basename(sys.argv[0])
+
+
+def parse_args():
+    """ Parse command line arguments """
+    random_session = base64.urlsafe_b64encode(os.urandom(9)).decode("utf-8")
+    session_id = os.getenv("SESSION_ID", random_session)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+            "--debug",
+            dest="debug",
+            default=False,
+            action="store_true",
+            help="Turn on debug output"
+            )
+    parser.add_argument(
+            "--debug-log",
+            dest="debug_log",
+            default=None,
+            help="Specify a file for debug output. Implies --debug",
+            )
+    parser.add_argument(
+            "--verbose",
+            dest="verbose",
+            default=False,
+            action="store_true",
+            help="Turn on verbose output"
+            )
+    parser.add_argument(
+            "--log",
+            dest="output_log",
+            default=None,
+            help="Specify a log file to log debug data to"
+            )
+    parser.add_argument(
+            "--session-id",
+            dest="session_id",
+            default=session_id,
+            help="Specify a session id for syslog logging"
+            )
+    parser.add_argument(
+            "path",
+            nargs="?",
+            default=os.getcwd(),
+            help="Specify the base path to the project [Default: %(default)s]",
+            )
+    opts, remaining = parser.parse_known_args()
+    if opts.debug_log:
+        opts.debug = True
+
+    return opts, remaining
+
+
+def main(opts, args):
+    """ Default entry point """
+    log = logging.getLogger(SLIM_SHADY)
+
+    app = QtWidgets.QApplication(args)
+    MainWindow = libprojecttree.ui.main.Window(
+            libprojecttree.gui.main.Ui_MainWindow,
+            os.path.realpath(opts.path),
+            )
+    MainWindow.show()
+    sys.exit(app.exec_())
+
+
+
+if __name__ == "__main__":
+
+    _opts, _args = parse_args()
+    _log = logging.getLogger(__name__)
+    _log.addHandler(logging.NullHandler())
+
+    if _opts.debug:
+        if _opts.debug_log:
+            logging.basicConfig(level=logging.DEBUG,
+                format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+                filename=_opts.debug_log,
+                filemode='w')
+        else:
+
+            _loghandler = logging.StreamHandler(sys.stderr)
+            _loghandler.setLevel(logging.DEBUG)
+            _formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+            _loghandler.setFormatter(_formatter)
+            _log.addHandler(_loghandler)
+    elif _opts.verbose:
+        _loghandler = logging.StreamHandler(sys.stderr)
+        _loghandler.setLevel(logging.ERROR)
+        _formatter = logging.Formatter("%(asctime)s %(name)s: %(message)s")
+        _loghandler.setFormatter(_formatter)
+        _log.addHandler(_loghandler)
+
+    # Set up a syslog output stream
+    _loghandler = logging.handlers.SysLogHandler("/dev/log")
+    _loghandler.setLevel(logging.ERROR)
+    _formatter = logging.Formatter("%(name)s[%(process)d]: {session} %(message)s".format(session=_opts.session_id))
+    _loghandler.setFormatter(_formatter)
+    _log.addHandler(_loghandler)
+
+    try:
+        main(_opts, _args)
+    except Exception as err:  # pylint: disable=W0703
+        sys.stderr.write("%s\n" % (textwrap.fill(str(err))))
+        if _opts.debug:
+            traceback.print_exc()
+        sys.exit(1)
+# vim: filetype=python:
