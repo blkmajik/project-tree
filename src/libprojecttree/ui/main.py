@@ -63,7 +63,7 @@ class Window(widgets.DesignerWindow):
         cmd = [
                 "gvim",
                 "--servername", server.decode("utf-8"),
-                "-geometry", " 80x57",
+                "-geometry", "80x57",
                 "--remote-silent",
                 fullPath,
                 ]
